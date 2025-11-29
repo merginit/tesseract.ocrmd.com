@@ -1,63 +1,85 @@
-tesseract.js-core
-=================
+Tesseract.js Core (WebAssembly builds)
+======================================
 
-![](https://raw.githubusercontent.com/jeromewu/tesseract.js-core/master/assets/images/tesseract.js-core.png)
+Prebuilt, CDN‑ready Tesseract.js core WebAssembly bundles for browser and Node. Use these files directly without compiling Tesseract yourself.
 
-Core part of [tesseract.js](https://github.com/naptha/tesseract.js), which compiles original tesseract from C to JavaScript WebAssembly.
+**What’s here**
+- WebAssembly builds and JS wrappers: baseline, SIMD, LSTM, and SIMD+LSTM variants.
+- A minified worker script compatible with `tesseract.js`.
+- Static hosting‑friendly headers for secure CDN usage.
 
+**Files**
+- `tesseract-core.wasm.js`, `tesseract-core.wasm`
+- `tesseract-core-simd.wasm.js`, `tesseract-core-simd.wasm`
+- `tesseract-core-lstm.wasm.js`, `tesseract-core-lstm.wasm`
+- `tesseract-core-simd-lstm.wasm.js`, `tesseract-core-simd-lstm.wasm`
+- `tesseract-worker.min.js`
 
-## Compiling
+Quick Start — Browser (CDN)
+---------------------------
+```js
+import Tesseract from 'tesseract.js';
 
-To build tesseract-core.js by yourself, please install [docker](https://www.docker.com/) and run:
+const worker = await Tesseract.createWorker({
+  corePath: 'https://tesseract.ocrmd.com/tesseract-core-simd.wasm.js',
+  workerPath: 'https://tesseract.ocrmd.com/tesseract-worker.min.js',
+});
 
+await worker.load();
+await worker.loadLanguage('eng');
+await worker.initialize('eng');
+const { data: { text } } = await worker.recognize(imageElementOrBlobOrUrl);
+await worker.terminate();
 ```
-bash build-with-docker.sh
+
+Quick Start — Node (npm)
+------------------------
+```bash
+npm i tesseract.js tesseract.js-core
 ```
 
-The generated files will be stored in root path.  When compiling, errors sometimes occur due to race conditions (some dependencies do not appear to compile properly in parallel).  Re-running generally resolves. 
+```js
+const Tesseract = require('tesseract.js');
 
-## Structure
+const worker = await Tesseract.createWorker({
+  corePath: require.resolve('tesseract.js-core/tesseract-core-simd.wasm.js'),
+});
 
-1.	Build scripts are in `build-scripts` folder
-2.	Javascript/wrapper files are in `javascript` folder
-3.	All dependencies (including Tesseract) are in `third_party` folder
-    1. All dependencies are unmodified except for Tesseract, which uses a forked repo
-    1. The Tesseract repo has the following changes:
-       1. Modified `CMakeLists.txt` to build with emscripten
-       1. Modified `ltrresultiterator.h` and `ltrresultiterator.cpp` to add `WordChoiceIterator` class
-       1. Added `src/arch_sse` folder, which is used instead of `src/arch` for the simd-enabled build
-          1. This hard-codes the use of the SSE function
-       1. Commented out "Empty page!!" message in `src/textord/colfind.cpp` to prevent this from printing to console
-       1. Added functions for detecting page angle and applying rotation
-          1. Modified `src/ccmain/thresholder.cpp`, `src/ccmain/thresholder.h`, `src/api/baseapi.cpp`, and `include/tesseract/baseapi.h` to add `exif` and `angle` arguments for rotating images
-          1. Changed `FindLines` from "protected" to "public" in `baseapi.h` to expose to Javascript
-             1. Allows for lines (and therefore page angle) to be detected without running unnecessary steps afterwards
-          1. Added public `GetGradient` function to `baseapi.h` and `baseapi.cpp` for reporting page angle
-             1. Also required minor changes to `src/ccmain/tesseractclass.h`, `src/ccmain/pagesegmain.cpp`, `src/textord/textord.cpp`, and `src/textord/textord.h`
-                1. See this commit: https://github.com/Balearica/tesseract/commit/db6951f655263878f6344380a5ddb95e678d7c09
-       2. Added `WriteImage` function to `baseapi.h` and `baseapi.cpp` for saving images (original, grey, and binary)
-       3. Added `SaveParameters` and `RestoreParameters` functions to `baseapi.h` and `baseapi.cpp` for saving and restoring parameters
-       4. Added calls to `EM_ASM_ARGS` to `src/ccmain/control.cpp` for progress logging (and added `<emscripten.h>` header)
-       5. Rewrote `tprintf` function in `src/ccutil/tprintf.cpp` to force flushing
-       6. Added new version of `SetImage` to `src/api/baseapi.cpp` and `include/tesseract/baseapi.h` that reads image from filesystem
-          1. This was done to resolve memory leak--see [this issue](https://github.com/naptha/tesseract.js/issues/678)
-       7. Edited `ParamUtils::PrintParams` in `src/ccutil/params.cpp` to remove description text (resolves bug)
-          1. The bug was reported in [this](https://github.com/tesseract-ocr/tesseract/issues/3943) Git Issue, so we can cut this point if resolved in a future version of Tesseract
-       8. Edited `src/ccmain/tessedit.cpp` to save error log to separate file (`/debugDev.txt`)
-       1. Added JSON as an ouput format
-          1. Added `src/api/jsonrenderer.cpp`, modified `CMakeLists.txt`, `include/tesseract/baseapi.h`, and `include/tesseract/renderer.h`
-
-## Running Minimal Examples
-To run the browser examples, launch a web server in the root of the repo (i.e. run `http-server`).  Then navigate to the pages in `examples/web/minimal/` in your browser.  
-
-To run the node examples, navigate to `examples/node/minimal/` and then run e.g. `node index.wasm.js [input_file]`.
-
-The "benchmark" examples behave similarly, except that they take longer to run and report runtime instead of recognition text.  All other examples are experimental and should not be expected to run. 
-
-## Contribution
-
-As we leverage git-submodule to manage dependencies, remember to add recursive when cloning the repository:
-
+await worker.load();
+await worker.loadLanguage('eng');
+await worker.initialize('eng');
+const { data: { text } } = await worker.recognize('/path/to/image.png');
+await worker.terminate();
 ```
-git clone --recursive https://github.com/naptha/tesseract.js-core
-```
+
+Build Variants
+--------------
+- `tesseract-core.wasm.js` — baseline WebAssembly build.
+- `tesseract-core-simd.wasm.js` — SIMD‑optimized; fastest where supported.
+- `tesseract-core-lstm.wasm.js` — accuracy‑focused LSTM build.
+- `tesseract-core-simd-lstm.wasm.js` — best accuracy + speed; requires SIMD support.
+
+Recommendation: prefer `*-simd.wasm.js` in modern browsers. Feature‑detect SIMD and fall back to baseline when unavailable.
+
+Compatibility & Requirements
+----------------------------
+- WebAssembly required; asm.js fallback is not provided in this distribution.
+- Works best with `tesseract.js` v5+.
+- SIMD support varies by browser/CPU.
+
+Hosting, CORS & CSP
+-------------------
+When using files from `https://tesseract.ocrmd.com`, response headers enforce strict security policies:
+- CORS allows `https://ocrmd.com`.
+- CSP restricts `worker-src`, `script-src`, `connect-src`, etc. Ensure your app’s CSP permits loading the worker and WASM from your chosen origin.
+
+Troubleshooting
+---------------
+- 404 or `TypeError: WebAssembly`: use the `*.wasm.js` wrapper, not the raw `*.wasm`.
+- CORS/CSP errors: align your site’s CSP with hosting policies.
+- Empty OCR results: verify language initialization and image quality.
+
+License & Credits
+-----------------
+- License: Apache‑2.0 (see `LICENSE.txt`).
+- Upstream source: https://github.com/naptha/tesseract.js-core
